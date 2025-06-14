@@ -10,3 +10,4 @@ numpy
 matplotlib
 Pillow
 simpleaudio
+pyaudioop
