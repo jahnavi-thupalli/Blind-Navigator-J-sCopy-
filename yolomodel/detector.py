@@ -5,7 +5,6 @@ import os
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
 from google.colab import files
-from IPython.display import display, HTML
 
 model = YOLO('yolov8n.pt')
 
@@ -73,9 +72,7 @@ def detect_on_video(video_path, output_path='output.mp4'):
 
     cap.release()
     out.release()
-    print("✅ Video saved as", output_path)
 
-    display(HTML(f'<a href="{output_path}" download>📥 Download Processed Video</a>'))
 
     # Generate description
     description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])
