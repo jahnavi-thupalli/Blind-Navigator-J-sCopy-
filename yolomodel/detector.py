@@ -31,11 +31,7 @@ def detect_on_image(image_path):
 
         class_counts[label] = class_counts.get(label, 0) + 1
 
-    plt.figure(figsize=(10, 6))
-    plt.imshow(img_rgb)
-    plt.axis('off')
-    plt.title('YOLOv8 Detection - Image')
-    plt.show()
+
 
     # Generate description
     description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])
