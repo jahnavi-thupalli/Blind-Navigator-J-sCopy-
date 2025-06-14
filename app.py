@@ -1,8 +1,8 @@
 import streamlit as st
 import os
 import io
-import gtts from gTTS
-import PIL from Image
+from gtts import gTTS
+from PIL import Image
 
 from tts.tts_engine import speak_text
 from yolomodel.detector import model, detect_on_image, detect_on_video
