@@ -8,6 +8,5 @@ def speak_text(text):
     fp = io.BytesIO()
     tts.write_to_fp(fp)
     fp.seek(0)
-
     audio = AudioSegment.from_file(fp, format="mp3")
     play(audio)
