@@ -11,3 +11,4 @@ numpy
 Pillow
 soundfile
 gTTS
+accelerate
