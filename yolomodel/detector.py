@@ -79,15 +79,3 @@ def detect_on_video(video_path, output_path='output.mp4'):
     description = [f"{label}: {count}" for label, count in class_counts.items()]
     return description
 
-
-if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-    desc = detect_on_image(filename)
-    print(desc)
-elif filename.lower().endswith(('.mp4', '.mov', '.avi')):
-    desc = detect_on_video(filename)
-    print(desc)
-else:
-    print("Unsupported file type. Please upload an image or video.")
-
-
-
