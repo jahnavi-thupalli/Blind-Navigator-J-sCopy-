@@ -2,6 +2,7 @@ import streamlit as st
 import os
 from yolomodel.detecter import detect_on_image, detect_on_video
 from vision.describer import input_for_func, describe_scene_tinyllama
+from tts.tts_engine import speak_text
 
 # UI Configuration with Dark Theme
 st.set_page_config(
@@ -361,6 +362,7 @@ with tab1:
                     description = describe_scene_tinyllama(detections, frame_width=640)
                     st.success("Image description generated successfully!")
                     st.info(description)
+                    speak_text(description)
                 except Exception as e:
                     st.error(f"Error processing image: {e}")
     else:
@@ -381,6 +383,7 @@ with tab2:
                     description = describe_scene_tinyllama(detections, frame_width=640)
                     st.success("Video description generated successfully!")
                     st.info(description)
+                    speak_text(description)
                 except Exception as e:
                     st.error(f"Error processing video: {e}")
     else:
