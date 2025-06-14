@@ -1,6 +1,7 @@
 import streamlit as st
 import os
 from yolomodel.detecter import detect_on_image, detect_on_video
+from vision.describer import input_for_func, describe_scene_tinyllama
 
 # UI Configuration with Dark Theme
 st.set_page_config(
@@ -347,91 +348,40 @@ st.markdown("---")
 tab1, tab2 = st.tabs(["Upload Image", "Upload Video"])
 
 with tab1:
-    images = get_assets(["jpg", "png", "jpeg"])
+    images = get_assets(["jpg", "jpeg", "png"])
     if images:
-        selected_image = st.selectbox(
-            "Choose an image:",
-            images,
-            index=None,
-            key="image_select",
-            help="Select an image from assets folder"
-        )
+        selected_image = st.selectbox("Choose an image:", images, index=None)
         if selected_image:
-            with st.container():
-                st.image(f"assets/{selected_image}", width=300)
-                st.markdown('</div>', unsafe_allow_html=True)
-            
-            # =============================================
-            # IMAGE PROCESSING LOGIC
-            # =============================================
-            # Add custom styling wrapper
-            st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
-            describe_image_clicked = st.button(
-                "Describe Image",
-                disabled=not selected_image,
-                help="Generate audio description of the selected image",
-                key="describe_image_btn"
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            if describe_image_clicked:
+            st.image(f"assets/{selected_image}", width=300)
+            if st.button("Describe Image"):
                 try:
-                    #if isinstance(image_source, str):
-                    desc = detect_on_image(selected_image)
-                else:
-                    with open("temp_uploaded_image.jpg", "wb") as f:
-                        f.write(image_source.read())
-                    desc = detect_on_image("temp_uploaded_image.jpg")
-
+                    image_path = os.path.join("assets", selected_image)
+                    results = detect_on_image(image_path)
+                    detections = input_for_func(results)
+                    description = describe_scene_tinyllama(detections, frame_width=640)
                     st.success("Image description generated successfully!")
+                    st.info(description)
                 except Exception as e:
-                    st.error(f"Error processing image: {str(e)}")
-            
+                    st.error(f"Error processing image: {e}")
     else:
-        st.warning("No images found in assets folder")
+        st.warning("No images found in assets folder.")
 
+# VIDEO TAB
 with tab2:
-    videos = get_assets(["mp4", "mov"])
+    videos = get_assets(["mp4", "mov", "avi"])
     if videos:
-        selected_video = st.selectbox(
-            "Choose a video:", 
-            videos,
-            index=None,
-            key="video_select",
-            help="Select a video from assets folder"
-        )
+        selected_video = st.selectbox("Choose a video:", videos, index=None)
         if selected_video:
-            with st.container():
-                #st.markdown('<div class="video-container">', unsafe_allow_html=True)
-                st.video(f"assets/{selected_video}")
-                st.markdown('</div>', unsafe_allow_html=True)
-            
-            # =============================================
-            # VIDEO PROCESSING LOGIC
-            # =============================================
-            # Add custom styling wrapper
-            st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
-            describe_video_clicked = st.button(
-                "Describe Video",
-                disabled=not selected_video,
-                help="Generate audio description of the selected video",
-                key="describe_video_btn"
-            )
-            st.markdown('</div>', unsafe_allow_html=True)
-            
-            if describe_video_clicked:
+            st.video(f"assets/{selected_video}")
+            if st.button("Describe Video"):
                 try:
-                    if isinstance(video_source, str):
-                    desc = detect_on_video(video_source)
-                else:
-                    with open("temp_uploaded_video.mp4", "wb") as f:
-                        f.write(video_source.read())
-                    desc = detect_on_video("temp_uploaded_video.mp4")
-
+                    video_path = os.path.join("assets", selected_video)
+                    results = detect_on_video(video_path)
+                    detections = input_for_func(results)
+                    description = describe_scene_tinyllama(detections, frame_width=640)
                     st.success("Video description generated successfully!")
-                    
+                    st.info(description)
                 except Exception as e:
-                    st.error(f"Error processing video: {str(e)}")
+                    st.error(f"Error processing video: {e}")
     else:
-        st.warning("No videos found in assets folder")
-
+        st.warning("No videos found in assets folder.")
