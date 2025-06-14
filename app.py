@@ -4,6 +4,12 @@ from yolomodel.detector import detect_on_image, detect_on_video, model
 from vision.describer import describe_scene_tinyllama, input_for_func
 from tts.tts_engine import speak_text
 
+# Add to app.py (after imports)
+@st.cache_resource
+def load_models():
+    # Initialize all models here
+    return detector, tts_engine
+
 # UI Configuration with Dark Theme
 st.set_page_config(
     page_title="Blind Navigator AI",
