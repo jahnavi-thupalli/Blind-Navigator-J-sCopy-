@@ -3,6 +3,7 @@ import os
 import io
 from gtts import gTTS
 from PIL import Image
+import cv2
 
 from tts.tts_engine import speak_text
 from yolomodel.detector import model, detect_on_image, detect_on_video
@@ -346,8 +347,10 @@ def get_assets(extensions):
 def process_image(image_path):
     """Process image through detection and description pipeline"""
     try:
-        # Run detection
-        results = detect_on_image(image_path)
+        # Run detection - modified to work with your detector.py
+        img = cv2.imread(image_path)
+        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
+        results = model(img_rgb)[0]
         
         # Convert to expected format
         detections = input_for_func(results)
@@ -360,7 +363,7 @@ def process_image(image_path):
         st.write("**Description:**")
         st.info(description)
         
-        # Generate and play audio
+        # Generate audio bytes
         audio_bytes = io.BytesIO()
         tts = gTTS(description)
         tts.write_to_fp(audio_bytes)
@@ -369,8 +372,10 @@ def process_image(image_path):
         
         # Show detected objects
         st.write("**Detected Objects:**")
-        for det in detections:
-            st.write(f"- {det['label']}")
+        for box in results.boxes:
+            cls_id = int(box.cls[0].item())
+            label = model.names[cls_id]
+            st.write(f"- {label}")
         
         return True
         
@@ -381,7 +386,7 @@ def process_image(image_path):
 def process_video(video_path):
     """Process video through detection and description pipeline"""
     try:
-        # Run detection
+        # Run detection - modified to work with your detector.py
         results = detect_on_video(video_path)
         
         # Convert to expected format
@@ -395,7 +400,7 @@ def process_video(video_path):
         st.write("**Description:**")
         st.info(description)
         
-        # Generate and play audio
+        # Generate audio bytes
         audio_bytes = io.BytesIO()
         tts = gTTS(description)
         tts.write_to_fp(audio_bytes)
@@ -404,8 +409,10 @@ def process_video(video_path):
         
         # Show detected objects
         st.write("**Detected Objects:**")
-        for det in detections:
-            st.write(f"- {det['label']}")
+        for box in results.boxes:
+            cls_id = int(box.cls[0].item())
+            label = model.names[cls_id]
+            st.write(f"- {label}")
             
         return True
         
@@ -436,8 +443,8 @@ with tab1:
             image_path = f"assets/{selected_image}"
             st.image(image_path, width=300, caption="Selected Image")
             
-            if st.button("🔍 Describe Image"):
-                with st.spinner("🤖 AI is analyzing the image..."):
+            if st.button("Describe Image"):
+                with st.spinner("AI is analyzing the image..."):
                     process_image(image_path)
             
     else:
@@ -457,8 +464,8 @@ with tab2:
             video_path = f"assets/{selected_video}"
             st.video(video_path)
             
-            if st.button("🎬 Describe Video"):
-                with st.spinner("🤖 AI is analyzing the video..."):
+            if st.button("Describe Video"):
+                with st.spinner("AI is analyzing the video..."):
                     process_video(video_path)
                   
     else:
