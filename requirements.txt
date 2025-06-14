@@ -1,7 +1,7 @@
-streamlit==1.35.0
+streamlit>=1.35.0
 torch>=2.2.0
 transformers>=4.41.0
-sentencepiece>=0.1.99
+https://files.pythonhosted.org/packages/27/b0/0dbe0dcde80448901e70d4eae22e08bc7284c56fc34c2ac4be13925e0fc3/sentencepiece-0.1.99-cp310-cp310-manylinux2014_x86_64.whl
 accelerate>=0.29.3
 peft>=0.10.0
 scipy
