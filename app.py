@@ -347,33 +347,38 @@ def get_assets(extensions):
 def process_image(image_path):
     """Process image through detection and description pipeline"""
     try:
-        # Run detection - modified to work with your detector.py
+        # Run detection
         img = cv2.imread(image_path)
         img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
         results = model(img_rgb)[0]
         
-        # Convert to expected format
+        # Convert detections to proper format
         detections = input_for_func(results)
         
-        # Generate description
-        description = describe_scene_tinyllama(detections, frame_width=640)
-        
-        # Display results
-        st.success("Analysis complete!")
-        st.write("**Description:**")
-        st.info(description)
+        # Generate description using TinyLlama
+        description = describe_scene_tinyllama(detections, frame_width=img.shape[1])
         
         # Generate audio bytes
         audio_bytes = speak_text(description)
+        
+        # Display results
+        st.success("Analysis complete!")
+        st.subheader("Description:")
+        st.write(description)
+        
+        # Play audio
         st.audio(audio_bytes, format='audio/mp3')
-
         
         # Show detected objects
-        st.write("**Detected Objects:**")
+        st.subheader("Detected Objects:")
+        class_counts = {}
         for box in results.boxes:
             cls_id = int(box.cls[0].item())
             label = model.names[cls_id]
-            st.write(f"- {label}")
+            class_counts[label] = class_counts.get(label, 0) + 1
+        
+        for label, count in class_counts.items():
+            st.write(f"- {label}: {count}")
         
         return True
         
@@ -384,32 +389,40 @@ def process_image(image_path):
 def process_video(video_path):
     """Process video through detection and description pipeline"""
     try:
-        # Run detection - modified to work with your detector.py
-        results = detect_on_video(video_path)
+        # Run detection on first frame of video
+        cap = cv2.VideoCapture(video_path)
+        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+        ret, frame = cap.read()
         
-        # Convert to expected format
-        detections = input_for_func(results)
-        
-        # Generate description
-        description = describe_scene_tinyllama(detections, frame_width=640)
-        
-        # Display results
-        st.success("Analysis complete!")
-        st.write("**Description:**")
-        st.info(description)
-        
-        # Generate audio bytes
-        audio_bytes = speak_text(description)
-        st.audio(audio_bytes, format='audio/mp3')
-
-        
-        # Show detected objects
-        st.write("**Detected Objects:**")
-        for box in results.boxes:
-            cls_id = int(box.cls[0].item())
-            label = model.names[cls_id]
-            st.write(f"- {label}")
+        if ret:
+            # Process frame
+            results = model(frame)[0]
+            detections = input_for_func(results)
+            description = describe_scene_tinyllama(detections, frame_width=frame_width)
             
+            # Generate audio bytes
+            audio_bytes = speak_text(description)
+            
+            # Display results
+            st.success("Analysis complete!")
+            st.subheader("Description:")
+            st.write(description)
+            
+            # Play audio
+            st.audio(audio_bytes, format='audio/mp3')
+            
+            # Show detected objects
+            st.subheader("Detected Objects:")
+            class_counts = {}
+            for box in results.boxes:
+                cls_id = int(box.cls[0].item())
+                label = model.names[cls_id]
+                class_counts[label] = class_counts.get(label, 0) + 1
+            
+            for label, count in class_counts.items():
+                st.write(f"- {label}: {count}")
+        
+        cap.release()
         return True
         
     except Exception as e:
