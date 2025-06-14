@@ -1,13 +1,6 @@
 import streamlit as st
 import os
-import io
-from gtts import gTTS
-from PIL import Image
-import cv2
-
-from tts.tts_engine import speak_text
-from yolomodel.detector import model, detect_on_image, detect_on_video
-from vision.describer import input_for_func, describe_scene_tinyllama
+from yolomodel.detecter import detect_on_image, detect_on_video
 
 # UI Configuration with Dark Theme
 st.set_page_config(
@@ -344,90 +337,16 @@ def get_assets(extensions):
                 assets.append(file)
     return assets
 
-def process_image(image_path):
-    """Process image through detection and description pipeline"""
-    try:
-        # Run detection
-        img = cv2.imread(image_path)
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = model(img_rgb)[0]
-        
-        # Convert detections to proper format
-        detections = input_for_func(results)
-        
-        # Generate description using TinyLlama
-        description = describe_scene_tinyllama(detections, frame_width=img.shape[1])
-        
-        # Generate audio bytes
-        audio_bytes = speak_text(description)
-        
-        # Display results
-        st.success("Analysis complete!")
-        st.subheader("Description:")
-        st.write(description)
-        
-        # Play audio
-        st.audio(audio_bytes, format='audio/mp3')
-        
-        # Show detected objects
-        st.subheader("Detected Objects:")
-        class_counts = {}
-        for box in results.boxes:
-            cls_id = int(box.cls[0].item())
-            label = model.names[cls_id]
-            class_counts[label] = class_counts.get(label, 0) + 1
-        
-        for label, count in class_counts.items():
-            st.write(f"- {label}: {count}")
-        
-        return True
-        
-    except Exception as e:
-        st.error(f"Error processing image: {str(e)}")
-        return False
+# =============================================
+# MODEL INITIALIZATION (Should be done once)
+# =============================================
+# TODO: Initialize YOLOv8 model here for better performance
+# from yolomodel.detector import ObjectDetector
+# detector = ObjectDetector(weights='yolov8n.pt')  # Example initialization
 
-def process_video(video_path):
-    """Process video through detection and description pipeline"""
-    try:
-        # Run detection on first frame of video
-        cap = cv2.VideoCapture(video_path)
-        frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        ret, frame = cap.read()
-        
-        if ret:
-            # Process frame
-            results = model(frame)[0]
-            detections = input_for_func(results)
-            description = describe_scene_tinyllama(detections, frame_width=frame_width)
-            
-            # Generate audio bytes
-            audio_bytes = speak_text(description)
-            
-            # Display results
-            st.success("Analysis complete!")
-            st.subheader("Description:")
-            st.write(description)
-            
-            # Play audio
-            st.audio(audio_bytes, format='audio/mp3')
-            
-            # Show detected objects
-            st.subheader("Detected Objects:")
-            class_counts = {}
-            for box in results.boxes:
-                cls_id = int(box.cls[0].item())
-                label = model.names[cls_id]
-                class_counts[label] = class_counts.get(label, 0) + 1
-            
-            for label, count in class_counts.items():
-                st.write(f"- {label}: {count}")
-        
-        cap.release()
-        return True
-        
-    except Exception as e:
-        st.error(f"Error processing video: {str(e)}")
-        return False
+# TODO: Initialize TTS engine
+# from tts.tts_engine import TTSEngine
+# tts = TTSEngine(engine='gTTS')  # or 'pyttsx3'
 
 # Main UI
 st.markdown("""
@@ -449,12 +368,43 @@ with tab1:
             help="Select an image from assets folder"
         )
         if selected_image:
-            image_path = f"assets/{selected_image}"
-            st.image(image_path, width=300, caption="Selected Image")
+            with st.container():
+                #st.markdown('<div class="image-container">', unsafe_allow_html=True)
+                st.image(f"assets/{selected_image}", width=300)
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            if st.button("Describe Image"):
-                with st.spinner("AI is analyzing the image..."):
-                    process_image(image_path)
+            # =============================================
+            # IMAGE PROCESSING LOGIC
+            # =============================================
+            # Add custom styling wrapper
+            st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
+            describe_image_clicked = st.button(
+                "Describe Image",
+                disabled=not selected_image,
+                help="Generate audio description of the selected image",
+                key="describe_image_btn"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            if describe_image_clicked:
+                try:
+                    # TODO: Add image processing pipeline
+                    # 1. Run object detection
+                    # results = detector.detect(f"assets/{selected_image}")
+                    
+                    # 2. Convert detections to spatial descriptions
+                    # from vision.describer import generate_description
+                    # description = generate_description(results)
+                    
+                    # 3. Generate audio output
+                    # audio_file = tts.synthesize(description)
+                    # st.audio(audio_file)
+                    
+                    # Temporary placeholder
+                    st.success("Image description generated successfully!")
+                    st.info("Demo output would include: detected objects with positions")
+                except Exception as e:
+                    st.error(f"Error processing image: {str(e)}")
             
     else:
         st.warning("No images found in assets folder")
@@ -470,12 +420,40 @@ with tab2:
             help="Select a video from assets folder"
         )
         if selected_video:
-            video_path = f"assets/{selected_video}"
-            st.video(video_path)
+            with st.container():
+                #st.markdown('<div class="video-container">', unsafe_allow_html=True)
+                st.video(f"assets/{selected_video}")
+                st.markdown('</div>', unsafe_allow_html=True)
             
-            if st.button("Describe Video"):
-                with st.spinner("AI is analyzing the video..."):
-                    process_video(video_path)
-                  
+            # =============================================
+            # VIDEO PROCESSING LOGIC
+            # =============================================
+            # Add custom styling wrapper
+            st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
+            describe_video_clicked = st.button(
+                "Describe Video",
+                disabled=not selected_video,
+                help="Generate audio description of the selected video",
+                key="describe_video_btn"
+            )
+            st.markdown('</div>', unsafe_allow_html=True)
+            
+            if describe_video_clicked:
+                try:
+                    # TODO: Add video processing pipeline
+                    # from input_handlers.video_processor import process_video
+                    # output_file = process_video(
+                    #     input_path=f"assets/{selected_video}",
+                    #     detector=detector,
+                    #     tts_engine=tts
+                    # )
+                    # st.video(output_file)
+                    
+                    # Temporary placeholder
+                    st.success("Video processing started!")
+                    st.info("Demo would process each frame and provide audio descriptions")
+                except Exception as e:
+                    st.error(f"Error processing video: {str(e)}")
     else:
         st.warning("No videos found in assets folder")
+
