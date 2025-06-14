@@ -1,11 +1,11 @@
 import streamlit as st
 import os
-import cv2
 import io
+import gtts from gTTS
+import PIL from Image
 
-# Import your modules
 from tts.tts_engine import speak_text
-from yolomodel.detector import detect_on_image, detect_on_video
+from yolomodel.detector import model, detect_on_image, detect_on_video
 from vision.describer import input_for_func, describe_scene_tinyllama
 
 # UI Configuration with Dark Theme
@@ -152,7 +152,7 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
     
-    /* Button Styling */
+    /* Button Styling - Exact same as Upload tab */
     .stButton > button,
     button[data-testid="baseButton-secondary"],
     button[data-testid="baseButton-primary"],
@@ -268,6 +268,22 @@ st.markdown("""
         color: var(--error);
     }
     
+    /* Sidebar Styling (if used) */
+    .css-1d391kg {
+        background: var(--bg-tertiary);
+        border-right: 1px solid var(--border-primary);
+    }
+    
+    /* Metric Styling */
+    .metric-container {
+        background: var(--bg-card);
+        border-radius: 12px;
+        padding: 1.5rem;
+        border: 1px solid var(--border-primary);
+        margin: 1rem 0;
+        box-shadow: var(--shadow-md);
+    }
+    
     /* Custom scrollbar */
     ::-webkit-scrollbar {
         width: 8px;
@@ -318,24 +334,8 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# Convert TTS to audio bytes for Streamlit
-def get_audio_bytes(text):
-    """Convert text to audio bytes using your TTS module"""
-    try:
-        # Use your speak_text function to get audio
-        from gtts import gTTS
-        tts = gTTS(text=text, lang='en', slow=False)
-        fp = io.BytesIO()
-        tts.write_to_fp(fp)
-        fp.seek(0)
-        return fp.getvalue()
-    except Exception as e:
-        st.error(f"Error generating audio: {e}")
-        return None
-
 # Get files from assets folder
 def get_assets(extensions):
-    """Get files from assets folder with given extensions"""
     assets = []
     if os.path.exists("assets"):
         for file in os.listdir("assets"):
@@ -343,21 +343,75 @@ def get_assets(extensions):
                 assets.append(file)
     return assets
 
-# Save uploaded file
-def save_uploaded_file(uploaded_file, file_type):
-    """Save uploaded file to disk"""
+def process_image(image_path):
+    """Process image through detection and description pipeline"""
     try:
-        file_path = f"temp_{uploaded_file.name}"
-        with open(file_path, "wb") as f:
-            f.write(uploaded_file.getbuffer())
-        return file_path
+        # Run detection
+        results = detect_on_image(image_path)
+        
+        # Convert to expected format
+        detections = input_for_func(results)
+        
+        # Generate description
+        description = describe_scene_tinyllama(detections, frame_width=640)
+        
+        # Display results
+        st.success("Analysis complete!")
+        st.write("**Description:**")
+        st.info(description)
+        
+        # Generate and play audio
+        audio_bytes = io.BytesIO()
+        tts = gTTS(description)
+        tts.write_to_fp(audio_bytes)
+        audio_bytes.seek(0)
+        st.audio(audio_bytes, format='audio/mp3')
+        
+        # Show detected objects
+        st.write("**Detected Objects:**")
+        for det in detections:
+            st.write(f"- {det['label']}")
+        
+        return True
+        
     except Exception as e:
-        st.error(f"Error saving file: {e}")
-        return None
+        st.error(f"Error processing image: {str(e)}")
+        return False
 
-# =============================================
-# MAIN UI
-# =============================================
+def process_video(video_path):
+    """Process video through detection and description pipeline"""
+    try:
+        # Run detection
+        results = detect_on_video(video_path)
+        
+        # Convert to expected format
+        detections = input_for_func(results)
+        
+        # Generate description
+        description = describe_scene_tinyllama(detections, frame_width=640)
+        
+        # Display results
+        st.success("Analysis complete!")
+        st.write("**Description:**")
+        st.info(description)
+        
+        # Generate and play audio
+        audio_bytes = io.BytesIO()
+        tts = gTTS(description)
+        tts.write_to_fp(audio_bytes)
+        audio_bytes.seek(0)
+        st.audio(audio_bytes, format='audio/mp3')
+        
+        # Show detected objects
+        st.write("**Detected Objects:**")
+        for det in detections:
+            st.write(f"- {det['label']}")
+            
+        return True
+        
+    except Exception as e:
+        st.error(f"Error processing video: {str(e)}")
+        return False
 
 # Main UI
 st.markdown("""
@@ -365,167 +419,47 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.markdown("---")
 
-# Create tabs
+# Create tabs with custom styling
 tab1, tab2 = st.tabs(["Upload Image", "Upload Video"])
 
 with tab1:
-    st.subheader("🖼️ Image Analysis")
-    
-    # File uploader
-    uploaded_file = st.file_uploader(
-        "Choose an image file", 
-        type=['jpg', 'jpeg', 'png'],
-        help="Upload an image for object detection and audio description"
-    )
-    
-    # Assets folder selection
     images = get_assets(["jpg", "png", "jpeg"])
-    selected_image = None
     if images:
-        st.write("Or select from assets folder:")
         selected_image = st.selectbox(
             "Choose an image:",
-            [None] + images,
-            index=0,
+            images,
+            index=None,
             key="image_select",
             help="Select an image from assets folder"
         )
-    
-    # Display selected image
-    image_to_process = None
-    if uploaded_file is not None:
-        # Save uploaded file
-        image_to_process = save_uploaded_file(uploaded_file, "image")
-        if image_to_process:
-            st.image(uploaded_file, width=300, caption="Uploaded Image")
-    elif selected_image:
-        image_to_process = f"assets/{selected_image}"
-        st.image(image_to_process, width=300, caption="Selected Image")
-    
-    # Process button
-    if image_to_process:
-        describe_image_clicked = st.button(
-            "🔍 Describe Image",
-            disabled=not image_to_process,
-            help="Generate audio description of the selected image",
-            key="describe_image_btn"
-        )
-        
-        if describe_image_clicked:
-            with st.spinner("🤖 AI is analyzing the image..."):
-                try:
-                    # Call your detector function
-                    results = detect_on_image(image_to_process)
-                    
-                    if results:
-                        # Convert to detections format
-                        detections = input_for_func(results)
-                        
-                        # Generate description
-                        description = describe_scene_tinyllama(detections, frame_width=640)
-                        
-                        # Display results
-                        st.success("✅ Analysis Complete!")
-                        st.write("**Description:**")
-                        st.info(description)
-                        
-                        # Generate and play audio
-                        audio_bytes = get_audio_bytes(description)
-                        if audio_bytes:
-                            st.audio(audio_bytes, format='audio/mp3')
-                        
-                        # Show detected objects
-                        if detections:
-                            st.write("**Detected Objects:**")
-                            for i, det in enumerate(detections, 1):
-                                st.write(f"{i}. {det['label']}")
-                    else:
-                        st.warning("No objects detected in the image")
-                        
-                except Exception as e:
-                    st.error(f"Error processing image: {str(e)}")
-                finally:
-                    # Clean up temporary file
-                    if uploaded_file is not None and image_to_process and os.path.exists(image_to_process):
-                        os.unlink(image_to_process)
+        if selected_image:
+            image_path = f"assets/{selected_image}"
+            st.image(image_path, width=300, caption="Selected Image")
+            
+            if st.button("🔍 Describe Image"):
+                with st.spinner("🤖 AI is analyzing the image..."):
+                    process_image(image_path)
+            
+    else:
+        st.warning("No images found in assets folder")
 
 with tab2:
-    st.subheader("🎥 Video Analysis")
-    
-    # File uploader for video
-    uploaded_video = st.file_uploader(
-        "Choose a video file", 
-        type=['mp4', 'mov', 'avi'],
-        help="Upload a video for object detection and audio description"
-    )
-    
-    # Assets folder selection
-    videos = get_assets(["mp4", "mov", "avi"])
-    selected_video = None
+    videos = get_assets(["mp4", "mov"])
     if videos:
-        st.write("Or select from assets folder:")
         selected_video = st.selectbox(
             "Choose a video:", 
-            [None] + videos,
-            index=0,
+            videos,
+            index=None,
             key="video_select",
             help="Select a video from assets folder"
         )
-    
-    # Display selected video
-    video_to_process = None
-    if uploaded_video is not None:
-        # Save uploaded file
-        video_to_process = save_uploaded_file(uploaded_video, "video")
-        if video_to_process:
-            st.video(uploaded_video)
-    elif selected_video:
-        video_to_process = f"assets/{selected_video}"
-        st.video(video_to_process)
-    
-    # Process button
-    if video_to_process:
-        describe_video_clicked = st.button(
-            "🎬 Describe Video",
-            disabled=not video_to_process,
-            help="Generate audio description of the selected video",
-            key="describe_video_btn"
-        )
-        
-        if describe_video_clicked:
-            with st.spinner("🤖 AI is analyzing the video..."):
-                try:
-                    # Call your detector function
-                    results = detect_on_video(video_to_process)
-                    
-                    if results:
-                        # Convert to detections format
-                        detections = input_for_func(results)
-                        
-                        # Generate description
-                        description = describe_scene_tinyllama(detections, frame_width=640)
-                        
-                        # Display results
-                        st.success("✅ Video Analysis Complete!")
-                        st.write("**Scene Description:**")
-                        st.info(description)
-                        
-                        # Generate and play audio
-                        audio_bytes = get_audio_bytes(description)
-                        if audio_bytes:
-                            st.audio(audio_bytes, format='audio/mp3')
-                        
-                        # Show detected objects
-                        if detections:
-                            st.write("**Detected Objects:**")
-                            for i, det in enumerate(detections, 1):
-                                st.write(f"{i}. {det['label']}")
-                    else:
-                        st.warning("No objects detected in the video")
-                        
-                except Exception as e:
-                    st.error(f"Error processing video: {str(e)}")
-                finally:
-                    # Clean up temporary file
-                    if uploaded_video is not None and video_to_process and os.path.exists(video_to_process):
-                        os.unlink(video_to_process)
+        if selected_video:
+            video_path = f"assets/{selected_video}"
+            st.video(video_path)
+            
+            if st.button("🎬 Describe Video"):
+                with st.spinner("🤖 AI is analyzing the video..."):
+                    process_video(video_path)
+                  
+    else:
+        st.warning("No videos found in assets folder")
