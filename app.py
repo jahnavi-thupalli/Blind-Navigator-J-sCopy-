@@ -337,17 +337,6 @@ def get_assets(extensions):
                 assets.append(file)
     return assets
 
-# =============================================
-# MODEL INITIALIZATION (Should be done once)
-# =============================================
-# TODO: Initialize YOLOv8 model here for better performance
-# from yolomodel.detector import ObjectDetector
-# detector = ObjectDetector(weights='yolov8n.pt')  # Example initialization
-
-# TODO: Initialize TTS engine
-# from tts.tts_engine import TTSEngine
-# tts = TTSEngine(engine='gTTS')  # or 'pyttsx3'
-
 # Main UI
 st.markdown("""
 <h1 style="color: #ff7f00 !important; font-family: 'Marker Felt', cursive !important; font-weight: 700 !important; font-size: 3rem !important; text-align: center !important; margin-bottom: 0.5rem !important; letter-spacing: 0.05em !important; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3) !important;">Blind Navigator AI</h1>
@@ -369,7 +358,6 @@ with tab1:
         )
         if selected_image:
             with st.container():
-                #st.markdown('<div class="image-container">', unsafe_allow_html=True)
                 st.image(f"assets/{selected_image}", width=300)
                 st.markdown('</div>', unsafe_allow_html=True)
             
@@ -388,21 +376,14 @@ with tab1:
             
             if describe_image_clicked:
                 try:
-                    # TODO: Add image processing pipeline
-                    # 1. Run object detection
-                    # results = detector.detect(f"assets/{selected_image}")
-                    
-                    # 2. Convert detections to spatial descriptions
-                    # from vision.describer import generate_description
-                    # description = generate_description(results)
-                    
-                    # 3. Generate audio output
-                    # audio_file = tts.synthesize(description)
-                    # st.audio(audio_file)
-                    
-                    # Temporary placeholder
+                    #if isinstance(image_source, str):
+                    desc = detect_on_image(selected_image)
+                else:
+                    with open("temp_uploaded_image.jpg", "wb") as f:
+                        f.write(image_source.read())
+                    desc = detect_on_image("temp_uploaded_image.jpg")
+
                     st.success("Image description generated successfully!")
-                    st.info("Demo output would include: detected objects with positions")
                 except Exception as e:
                     st.error(f"Error processing image: {str(e)}")
             
@@ -440,18 +421,15 @@ with tab2:
             
             if describe_video_clicked:
                 try:
-                    # TODO: Add video processing pipeline
-                    # from input_handlers.video_processor import process_video
-                    # output_file = process_video(
-                    #     input_path=f"assets/{selected_video}",
-                    #     detector=detector,
-                    #     tts_engine=tts
-                    # )
-                    # st.video(output_file)
+                    if isinstance(video_source, str):
+                    desc = detect_on_video(video_source)
+                else:
+                    with open("temp_uploaded_video.mp4", "wb") as f:
+                        f.write(video_source.read())
+                    desc = detect_on_video("temp_uploaded_video.mp4")
+
+                    st.success("Video description generated successfully!")
                     
-                    # Temporary placeholder
-                    st.success("Video processing started!")
-                    st.info("Demo would process each frame and provide audio descriptions")
                 except Exception as e:
                     st.error(f"Error processing video: {str(e)}")
     else:
