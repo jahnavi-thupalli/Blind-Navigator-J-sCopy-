@@ -30,7 +30,8 @@ def detect_on_image(image_path):
 
 
     # Generate description
-    description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])
+    description = [f"{label}: {count}" for label, count in class_counts.items()]
+
     return description
 
 
@@ -75,7 +76,7 @@ def detect_on_video(video_path, output_path='output.mp4'):
 
 
     # Generate description
-    description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])
+    description = [f"{label}: {count}" for label, count in class_counts.items()]
     return description
 
 
