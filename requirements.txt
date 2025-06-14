@@ -7,3 +7,5 @@ Pillow
 gTTS
 soundfile
 openai>=1.3.0
+pydub
+ffmpeg
