@@ -1,45 +1,57 @@
-detections = [
-    {"label": "person", "bbox": [80, 120, 160, 300]},
-    {"label": "bicycle", "bbox": [400, 100, 520, 280]}
-]
-
-frame_width = 640  
-PIXELS_PER_METER = 400  
-
-def analyze_object(obj):
-    x_min, y_min, x_max, y_max = obj["bbox"]
-    x_center = (x_min + x_max) / 2
-    bbox_width = x_max - x_min
-
-    if x_center < frame_width / 3:
-        pos = "on your left"
-    elif x_center < 2 * frame_width / 3:
-        pos = "ahead"
-    else:
-        pos = "on your right"
-
-    # Estimate distance: smaller width = further away
-    # Inverse relationship: closer objects have wider boxes
-    approx_distance_m = round((1.0 / bbox_width) * 100 * (PIXELS_PER_METER / frame_width), 2)
-
-    return f"a {obj['label']} {pos}, approximately {approx_distance_m} meters away"
-
-# Build spoken summary
-spoken_descriptions = [analyze_object(obj) for obj in detections]
-scene_summary = " and ".join(spoken_descriptions)
-
-# Build LLM prompt
-prompt = f"""<|system|>You are a voice assistant helping a blind user navigate their surroundings.</s>
-<|user|>The camera detected: {scene_summary}.
-{f"Note: {preference}" if preference else ""}
-Respond with one short spoken sentence summarizing this scene in a helpful, friendly tone.</s>
-<|assistant|>"""
-
-# Feed to TinyLLaMA or any pipeline
 from transformers import pipeline
-pipe = pipeline("text-generation", model="TinyLlama/TinyLlama-1.1B-Chat-v1.0")  # or your model
-output = pipe(prompt, max_new_tokens=90)[0]['generated_text']
+pipe = pipeline("text-generation", model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", device_map="auto")
 
-# Extract model response
-spoken_response = output.split("<|assistant|>")[-1].strip()
-print("🗣️", spoken_response)
+def describe_position(x_center, frame_width):
+    if x_center < frame_width / 3:
+        return "on your left"
+    elif x_center < 2 * frame_width / 3:
+        return "ahead"
+    else:
+        return "on your right"
+
+def estimate_distance(x1, x2):
+    width_pixels = x2 - x1
+    return round(2.0 * (1 / (width_pixels / 100)), 1)  
+
+
+def describe_scene_tinyllama(detections, frame_width, use_llm=True):
+    if not detections:
+        return "I couldn't detect anything in your surroundings."
+
+    if not use_llm:
+        description = []
+        for det in detections:
+            label = det["label"]
+            x1, _, x2, _ = det["bbox"]
+            x_center = (x1 + x2) / 2
+            position = describe_position(x_center, frame_width)
+            distance = estimate_distance(x1, x2)
+            description.append(f"{label} {position}, about {distance} meters away")
+        return ". ".join(description)
+
+    summary_parts = []
+    for det in detections:
+        label = det["label"]
+        x1, _, x2, _ = det["bbox"]
+        x_center = (x1 + x2) / 2
+        pos = describe_position(x_center, frame_width)
+        dist = estimate_distance(x1, x2)
+        summary_parts.append(f"{label} {pos} approximately {dist} meters")
+    grounded_summary = ", ".join(summary_parts)
+
+
+    prompt = f"""<|system|>Your job is to assist a blind user as their camera sees with no nonsense just facts . Be concise and speak as if you are guiding them in real time.only return a sentence describing their positions and distances.
+    </s><|user|>The following objects were detected in a {frame_width}px wide frame:{grounded_summary}.</s><|assistant|>"""
+
+    response = pipe(prompt, max_new_tokens=100, do_sample=True, temperature=0.7)[0]["generated_text"]
+    return response.split("<|assistant|>")[-1].strip()
+# Sample test
+if __name__ == "__main__":
+    detections = [
+        {"label": "person", "bbox": [80, 120, 160, 300]},
+        {"label": "bicycle", "bbox": [400, 100, 520, 280]},
+        {"label": "car", "bbox": [300, 200, 320, 180]},
+        {"label": "car", "bbox": [500, 200, 800, 180]}
+    ]
+    result = describe_scene_tinyllama(detections, frame_width=640)
+    print("🔊 Description:", result)
