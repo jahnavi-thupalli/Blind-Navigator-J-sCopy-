@@ -1,21 +1,26 @@
-from ultralytics import YOLO
+!pip install ultralytics opencv-python-headless --quiet
 import cv2
+import numpy as np
+import os
 import matplotlib.pyplot as plt
+from ultralytics import YOLO
+from google.colab import files
+from IPython.display import display, HTML
 
-class YOLODetector:
-    def __init__(self, model_path='yolov8n.pt'):
-        self.model = YOLO(model_path)
-        self.class_names = self.model.names
+model = YOLO('yolov8n.pt')
 
-def detect_image(self, image_path):
+print("Choose an image (.jpg/.png) or video (.mp4/.mov) to upload:")
+filename = "/content/sample.jpg"
+
+def detect_on_image(image_path):
     img = cv2.imread(image_path)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-    results = self.model(img_rgb)[0]
+    results = model(img_rgb)[0]
 
     for box in results.boxes:
         cls_id = int(box.cls[0])
-        label = self.class_names[cls_id]
+        label = model.names[cls_id]
         conf = float(box.conf[0])
         x1, y1, x2, y2 = map(int, box.xyxy[0])
         cv2.rectangle(img_rgb, (x1, y1), (x2, y2), (0, 255, 0), 2)
@@ -28,11 +33,11 @@ def detect_image(self, image_path):
     plt.title('YOLOv8 Detection - Image')
     plt.show()
 
-def detect_video(self, video_path, output_path='output.mp4', verbose=True):
+def detect_on_video(video_path, output_path='output.mp4'):
     cap = cv2.VideoCapture(video_path)
-    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    width  = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
     height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-    fps = cap.get(cv2.CAP_PROP_FPS)
+    fps    = cap.get(cv2.CAP_PROP_FPS)
 
     out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
@@ -42,22 +47,39 @@ def detect_video(self, video_path, output_path='output.mp4', verbose=True):
         if not ret:
             break
 
-        results = self.model(frame)[0]
+        results = model(frame)[0]
 
         for box in results.boxes:
             cls_id = int(box.cls[0])
-            label = self.class_names[cls_id]
+            label = model.names[cls_id]
             conf = float(box.conf[0])
             x1, y1, x2, y2 = map(int, box.xyxy[0])
+
+            # Draw bounding box and label
             cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
-            cv2.putText(frame, f'{label} {conf:.2f}', (x1, y1 - 10),
+            cv2.putText(frame, f"{label} {conf:.2f}", (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
         out.write(frame)
         frame_num += 1
-        if verbose and frame_num % 10 == 0:
-            print(f'Processed {frame_num} frames...')
+        if frame_num % 10 == 0:
+            print(f"Processed {frame_num} frames...")
 
     cap.release()
     out.release()
-    return output_path
+    print("✅ Video saved as", output_path)
+
+    # Show download button (if in notebook environment)
+    display(HTML(f'<a href="{output_path}" download>📥 Download Processed Video</a>'))
+
+
+# Decide based on file type
+if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
+    detect_on_image(filename)
+elif filename.lower().endswith(('.mp4', '.mov', '.avi')):
+    detect_on_video(filename)
+else:
+    print("Unsupported file type. Please upload an image or video.")
+
+
+
