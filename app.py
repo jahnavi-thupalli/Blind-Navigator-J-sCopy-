@@ -346,6 +346,8 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.markdown("---")
 
+model = YOLO("yolov8n.pt")
+
 # Create tabs with custom styling
 tab1, tab2 = st.tabs(["Upload Image", "Upload Video"])
 
@@ -359,8 +361,8 @@ with tab1:
                 try:
                     image_path = os.path.join("assets", selected_image)
                     results = detect_on_image(image_path)
-                    detections = input_for_func(results)
-                    description = describe_scene(detections, frame_width=640)
+                    detections = prepare_detections(results, frame_width=640, model = model)
+                    description = describe_scene(detections)
                     st.success("Image description generated successfully!")
                     st.info(description)
                     speak_text(description)
@@ -380,8 +382,8 @@ with tab2:
                 try:
                     video_path = os.path.join("assets", selected_video)
                     results = detect_on_video(video_path)
-                    detections = input_for_func(results)
-                    description = describe_scene(detections, frame_width=640)
+                    detections = prepare_detections(results, frame_width=640, model = model)
+                    description = describe_scene(detections)
                     st.success("Video description generated successfully!")
                     st.info(description)
                     speak_text(description)
