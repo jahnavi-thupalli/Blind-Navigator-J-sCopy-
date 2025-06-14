@@ -47,7 +47,7 @@ def describe_scene_tinyllama(detections, frame_width, use_llm=True):
     return response.split("<|assistant|>")[-1].strip()
 
 
-def input_for_func(results):
+def input_for_func(results,model = YOLO('yolov8n.pt')):
     detections = []
     for box in results.boxes:
         x1, y1, x2, y2 = box.xyxy[0].tolist()
