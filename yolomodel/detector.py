@@ -8,9 +8,6 @@ from google.colab import files
 
 model = YOLO('yolov8n.pt')
 
-print("Choose an image (.jpg/.png) or video (.mp4/.mov) to upload:")
-filename = "/content/sample.jpg"
-
 def detect_on_image(image_path):
     img = cv2.imread(image_path)
     img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
@@ -30,11 +27,7 @@ def detect_on_image(image_path):
 
         class_counts[label] = class_counts.get(label, 0) + 1
 
-    plt.figure(figsize=(10, 6))
-    plt.imshow(img_rgb)
-    plt.axis('off')
-    plt.title('YOLOv8 Detection - Image')
-    plt.show()
+
 
     # Generate description
     description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])

@@ -45,13 +45,17 @@ def describe_scene_tinyllama(detections, frame_width, use_llm=True):
 
     response = pipe(prompt, max_new_tokens=100, do_sample=True, temperature=0.7)[0]["generated_text"]
     return response.split("<|assistant|>")[-1].strip()
-# Sample test
-if __name__ == "__main__":
-    detections = [
-        {"label": "person", "bbox": [80, 120, 160, 300]},
-        {"label": "bicycle", "bbox": [400, 100, 520, 280]},
-        {"label": "car", "bbox": [300, 200, 320, 180]},
-        {"label": "car", "bbox": [500, 200, 800, 180]}
-    ]
-    result = describe_scene_tinyllama(detections, frame_width=640)
-    print("🔊 Description:", result)
+
+
+def input_for_func(results):
+    detections = []
+    for box in results.boxes:
+        x1, y1, x2, y2 = box.xyxy[0].tolist()
+        cls_id = int(box.cls[0].item())
+        label = model.names[cls_id]
+        detections.append({"label": label, "bbox": [x1, y1, x2, y2]})
+    return detections
+
+#Sample test
+#detections = input_for_func(results)
+#describe_scene_tinyllama(detections, frame_width=640)
