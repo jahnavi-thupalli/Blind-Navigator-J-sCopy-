@@ -18,6 +18,8 @@ def detect_on_image(image_path):
 
     results = model(img_rgb)[0]
 
+    class_counts = {}
+
     for box in results.boxes:
         cls_id = int(box.cls[0])
         label = model.names[cls_id]
@@ -27,11 +29,18 @@ def detect_on_image(image_path):
         cv2.putText(img_rgb, f'{label} {conf:.2f}', (x1, y1 - 10),
                     cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
+        class_counts[label] = class_counts.get(label, 0) + 1
+
     plt.figure(figsize=(10, 6))
     plt.imshow(img_rgb)
     plt.axis('off')
     plt.title('YOLOv8 Detection - Image')
     plt.show()
+
+    # Generate description
+    description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])
+    return description
+
 
 def detect_on_video(video_path, output_path='output.mp4'):
     cap = cv2.VideoCapture(video_path)
@@ -42,6 +51,8 @@ def detect_on_video(video_path, output_path='output.mp4'):
     out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
 
     frame_num = 0
+    class_counts = {}
+
     while cap.isOpened():
         ret, frame = cap.read()
         if not ret:
@@ -60,6 +71,8 @@ def detect_on_video(video_path, output_path='output.mp4'):
             cv2.putText(frame, f"{label} {conf:.2f}", (x1, y1 - 10),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
+            class_counts[label] = class_counts.get(label, 0) + 1
+
         out.write(frame)
         frame_num += 1
         if frame_num % 10 == 0:
@@ -69,15 +82,19 @@ def detect_on_video(video_path, output_path='output.mp4'):
     out.release()
     print("✅ Video saved as", output_path)
 
-    # Show download button (if in notebook environment)
     display(HTML(f'<a href="{output_path}" download>📥 Download Processed Video</a>'))
 
+    # Generate description
+    description = "Detected objects:\n" + "\n".join([f"{label}: {count}" for label, count in class_counts.items()])
+    return description
 
-# Decide based on file type
+
 if filename.lower().endswith(('.jpg', '.jpeg', '.png')):
-    detect_on_image(filename)
+    desc = detect_on_image(filename)
+    print(desc)
 elif filename.lower().endswith(('.mp4', '.mov', '.avi')):
-    detect_on_video(filename)
+    desc = detect_on_video(filename)
+    print(desc)
 else:
     print("Unsupported file type. Please upload an image or video.")
 
