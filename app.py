@@ -364,11 +364,9 @@ def process_image(image_path):
         st.info(description)
         
         # Generate audio bytes
-        audio_bytes = io.BytesIO()
-        tts = gTTS(description)
-        tts.write_to_fp(audio_bytes)
-        audio_bytes.seek(0)
+        audio_bytes = speak_text(description)
         st.audio(audio_bytes, format='audio/mp3')
+
         
         # Show detected objects
         st.write("**Detected Objects:**")
@@ -401,11 +399,9 @@ def process_video(video_path):
         st.info(description)
         
         # Generate audio bytes
-        audio_bytes = io.BytesIO()
-        tts = gTTS(description)
-        tts.write_to_fp(audio_bytes)
-        audio_bytes.seek(0)
+        audio_bytes = speak_text(description)
         st.audio(audio_bytes, format='audio/mp3')
+
         
         # Show detected objects
         st.write("**Detected Objects:**")
