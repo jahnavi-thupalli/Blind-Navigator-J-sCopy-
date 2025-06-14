@@ -1,13 +1,12 @@
 import streamlit as st
 import os
-import tempfile
 import cv2
-from ultralytics import YOLO
-from transformers import pipeline
-from gtts import gTTS
-from pydub import AudioSegment
 import io
-import torch
+
+# Import your modules
+from tts.tts_engine import speak_text
+from yolomodel.detector import detect_on_image, detect_on_video
+from vision.describer import input_for_func, describe_scene_tinyllama
 
 # UI Configuration with Dark Theme
 st.set_page_config(
@@ -153,7 +152,7 @@ st.markdown("""
         margin-bottom: 0.5rem;
     }
     
-    /* Button Styling - Exact same as Upload tab */
+    /* Button Styling */
     .stButton > button,
     button[data-testid="baseButton-secondary"],
     button[data-testid="baseButton-primary"],
@@ -269,22 +268,6 @@ st.markdown("""
         color: var(--error);
     }
     
-    /* Sidebar Styling (if used) */
-    .css-1d391kg {
-        background: var(--bg-tertiary);
-        border-right: 1px solid var(--border-primary);
-    }
-    
-    /* Metric Styling */
-    .metric-container {
-        background: var(--bg-card);
-        border-radius: 12px;
-        padding: 1.5rem;
-        border: 1px solid var(--border-primary);
-        margin: 1rem 0;
-        box-shadow: var(--shadow-md);
-    }
-    
     /* Custom scrollbar */
     ::-webkit-scrollbar {
         width: 8px;
@@ -335,37 +318,12 @@ st.markdown("""
 </style>
 """, unsafe_allow_html=True)
 
-# =============================================
-# INTEGRATION OF YOUR EXISTING MODULES
-# =============================================
-
-# Initialize models (cached for performance)
-@st.cache_resource
-def load_models():
-    """Load YOLO and TinyLlama models - cached to avoid reloading"""
+# Convert TTS to audio bytes for Streamlit
+def get_audio_bytes(text):
+    """Convert text to audio bytes using your TTS module"""
     try:
-        # Initialize YOLO model (from your detector.py)
-        model = YOLO('yolov8n.pt')
-        
-        # Initialize TinyLlama pipeline (from your describer.py)
-        try:
-            pipe = pipeline("text-generation", model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", 
-                           device_map="auto" if torch.cuda.is_available() else "cpu")
-        except Exception as e:
-            st.warning(f"TinyLlama model not available: {e}. Using fallback descriptions.")
-            pipe = None
-        
-        return model, pipe
-    except Exception as e:
-        st.error(f"Error loading models: {e}")
-        return None, None
-
-# Functions from your existing modules (integrated inline)
-
-# From tts_engine.py - speak_text function
-def speak_text_for_streamlit(text):
-    """Convert text to speech and return audio bytes for Streamlit"""
-    try:
+        # Use your speak_text function to get audio
+        from gtts import gTTS
         tts = gTTS(text=text, lang='en', slow=False)
         fp = io.BytesIO()
         tts.write_to_fp(fp)
@@ -375,111 +333,27 @@ def speak_text_for_streamlit(text):
         st.error(f"Error generating audio: {e}")
         return None
 
-# From describer.py functions
-def describe_position(x_center, frame_width):
-    if x_center < frame_width / 3:
-        return "on your left"
-    elif x_center < 2 * frame_width / 3:
-        return "ahead"
-    else:
-        return "on your right"
-
-def estimate_distance(x1, x2):
-    width_pixels = x2 - x1
-    return round(2.0 * (1 / (width_pixels / 100)), 1)
-
-def describe_scene_tinyllama(detections, frame_width, pipe, use_llm=True):
-    if not detections:
-        return "I couldn't detect anything in your surroundings."
-
-    if not use_llm or pipe is None:
-        description = []
-        for det in detections:
-            label = det["label"]
-            x1, _, x2, _ = det["bbox"]
-            x_center = (x1 + x2) / 2
-            position = describe_position(x_center, frame_width)
-            distance = estimate_distance(x1, x2)
-            description.append(f"{label} {position}, about {distance} meters away")
-        return ". ".join(description)
-
-    try:
-        summary_parts = []
-        for det in detections:
-            label = det["label"]
-            x1, _, x2, _ = det["bbox"]
-            x_center = (x1 + x2) / 2
-            pos = describe_position(x_center, frame_width)
-            dist = estimate_distance(x1, x2)
-            summary_parts.append(f"{label} {pos} approximately {dist} meters")
-        grounded_summary = ", ".join(summary_parts)
-
-        prompt = f"""<|system|>Your job is to assist a blind user as their camera sees with no nonsense just facts . Be concise and speak as if you are guiding them in real time.only return a sentence describing their positions and distances.
-        </s><|user|>The following objects were detected in a {frame_width}px wide frame:{grounded_summary}.</s><|assistant|>"""
-
-        response = pipe(prompt, max_new_tokens=100, do_sample=True, temperature=0.7)[0]["generated_text"]
-        return response.split("<|assistant|>")[-1].strip()
-    except Exception as e:
-        st.warning(f"LLM generation failed: {e}. Using fallback.")
-        return describe_scene_tinyllama(detections, frame_width, pipe, use_llm=False)
-
-def input_for_func(results, model):
-    """Convert YOLO results to detection format"""
-    detections = []
-    if results and results.boxes is not None:
-        for box in results.boxes:
-            x1, y1, x2, y2 = box.xyxy[0].tolist()
-            cls_id = int(box.cls[0].item())
-            label = model.names[cls_id]
-            detections.append({"label": label, "bbox": [x1, y1, x2, y2]})
-    return detections
-
-# From detector.py functions
-def detect_on_image(model, image_path):
-    """Detect objects in image"""
-    try:
-        img = cv2.imread(image_path)
-        if img is None:
-            return None, None
-        img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
-        results = model(img_rgb)[0]
-        return results, img_rgb.shape[1]
-    except Exception as e:
-        st.error(f"Error in image detection: {e}")
-        return None, None
-
-def detect_on_video(model, video_path, output_path='output.mp4'):
-    """Detect objects in video - process first few frames"""
-    try:
-        cap = cv2.VideoCapture(video_path)
-        if not cap.isOpened():
-            return None, None
-        
-        width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        fps = cap.get(cv2.CAP_PROP_FPS)
-        
-        # Process first frame for description
-        ret, frame = cap.read()
-        if ret:
-            results = model(frame)[0]
-            cap.release()
-            return results, width
-        else:
-            cap.release()
-            return None, None
-    except Exception as e:
-        st.error(f"Error in video detection: {e}")
-        return None, None
-
 # Get files from assets folder
 def get_assets(extensions):
+    """Get files from assets folder with given extensions"""
     assets = []
     if os.path.exists("assets"):
         for file in os.listdir("assets"):
             if file.split('.')[-1].lower() in extensions:
                 assets.append(file)
     return assets
+
+# Save uploaded file
+def save_uploaded_file(uploaded_file, file_type):
+    """Save uploaded file to disk"""
+    try:
+        file_path = f"temp_{uploaded_file.name}"
+        with open(file_path, "wb") as f:
+            f.write(uploaded_file.getbuffer())
+        return file_path
+    except Exception as e:
+        st.error(f"Error saving file: {e}")
+        return None
 
 # =============================================
 # MAIN UI
@@ -491,15 +365,7 @@ st.markdown("""
 """, unsafe_allow_html=True)
 st.markdown("---")
 
-# Load models
-model, pipe = load_models()
-if model is None:
-    st.error("❌ Could not load AI models. Please check your installation.")
-    st.stop()
-else:
-    st.success("✅ AI Vision System Loaded Successfully")
-
-# Create tabs with custom styling
+# Create tabs
 tab1, tab2 = st.tabs(["Upload Image", "Upload Video"])
 
 with tab1:
@@ -528,11 +394,10 @@ with tab1:
     # Display selected image
     image_to_process = None
     if uploaded_file is not None:
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.jpg') as tmp_file:
-            tmp_file.write(uploaded_file.getvalue())
-            image_to_process = tmp_file.name
-        st.image(uploaded_file, width=300, caption="Uploaded Image")
+        # Save uploaded file
+        image_to_process = save_uploaded_file(uploaded_file, "image")
+        if image_to_process:
+            st.image(uploaded_file, width=300, caption="Uploaded Image")
     elif selected_image:
         image_to_process = f"assets/{selected_image}"
         st.image(image_to_process, width=300, caption="Selected Image")
@@ -549,23 +414,23 @@ with tab1:
         if describe_image_clicked:
             with st.spinner("🤖 AI is analyzing the image..."):
                 try:
-                    # Run detection using your detector.py logic
-                    results, frame_width = detect_on_image(model, image_to_process)
+                    # Call your detector function
+                    results = detect_on_image(image_to_process)
                     
-                    if results and frame_width:
-                        # Convert to your detection format
-                        detections = input_for_func(results, model)
+                    if results:
+                        # Convert to detections format
+                        detections = input_for_func(results)
                         
-                        # Generate description using your describer.py logic
-                        description = describe_scene_tinyllama(detections, frame_width, pipe)
+                        # Generate description
+                        description = describe_scene_tinyllama(detections, frame_width=640)
                         
                         # Display results
                         st.success("✅ Analysis Complete!")
                         st.write("**Description:**")
                         st.info(description)
                         
-                        # Generate audio using your tts_engine.py logic
-                        audio_bytes = speak_text_for_streamlit(description)
+                        # Generate and play audio
+                        audio_bytes = get_audio_bytes(description)
                         if audio_bytes:
                             st.audio(audio_bytes, format='audio/mp3')
                         
@@ -581,7 +446,7 @@ with tab1:
                     st.error(f"Error processing image: {str(e)}")
                 finally:
                     # Clean up temporary file
-                    if uploaded_file is not None and os.path.exists(image_to_process):
+                    if uploaded_file is not None and image_to_process and os.path.exists(image_to_process):
                         os.unlink(image_to_process)
 
 with tab2:
@@ -595,7 +460,7 @@ with tab2:
     )
     
     # Assets folder selection
-    videos = get_assets(["mp4", "mov"])
+    videos = get_assets(["mp4", "mov", "avi"])
     selected_video = None
     if videos:
         st.write("Or select from assets folder:")
@@ -610,11 +475,10 @@ with tab2:
     # Display selected video
     video_to_process = None
     if uploaded_video is not None:
-        # Save uploaded file temporarily
-        with tempfile.NamedTemporaryFile(delete=False, suffix='.mp4') as tmp_file:
-            tmp_file.write(uploaded_video.getvalue())
-            video_to_process = tmp_file.name
-        st.video(uploaded_video)
+        # Save uploaded file
+        video_to_process = save_uploaded_file(uploaded_video, "video")
+        if video_to_process:
+            st.video(uploaded_video)
     elif selected_video:
         video_to_process = f"assets/{selected_video}"
         st.video(video_to_process)
@@ -631,23 +495,23 @@ with tab2:
         if describe_video_clicked:
             with st.spinner("🤖 AI is analyzing the video..."):
                 try:
-                    # Run detection on first frame using your detector.py logic
-                    results, frame_width = detect_on_video(model, video_to_process)
+                    # Call your detector function
+                    results = detect_on_video(video_to_process)
                     
-                    if results and frame_width:
-                        # Convert to your detection format
-                        detections = input_for_func(results, model)
+                    if results:
+                        # Convert to detections format
+                        detections = input_for_func(results)
                         
-                        # Generate description using your describer.py logic
-                        description = describe_scene_tinyllama(detections, frame_width, pipe)
+                        # Generate description
+                        description = describe_scene_tinyllama(detections, frame_width=640)
                         
                         # Display results
                         st.success("✅ Video Analysis Complete!")
                         st.write("**Scene Description:**")
                         st.info(description)
                         
-                        # Generate audio using your tts_engine.py logic
-                        audio_bytes = speak_text_for_streamlit(description)
+                        # Generate and play audio
+                        audio_bytes = get_audio_bytes(description)
                         if audio_bytes:
                             st.audio(audio_bytes, format='audio/mp3')
                         
@@ -663,5 +527,5 @@ with tab2:
                     st.error(f"Error processing video: {str(e)}")
                 finally:
                     # Clean up temporary file
-                    if uploaded_video is not None and os.path.exists(video_to_process):
+                    if uploaded_video is not None and video_to_process and os.path.exists(video_to_process):
                         os.unlink(video_to_process)
