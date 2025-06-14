@@ -1,4 +1,4 @@
-!pip install ultralytics opencv-python-headless --quiet
+#!pip install ultralytics opencv-python-headless --quiet
 import cv2
 import numpy as np
 import os
