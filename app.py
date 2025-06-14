@@ -1,6 +1,6 @@
 import streamlit as st
 import os
-from yolomodel.detecter import detect_on_image, detect_on_video
+from yolomodel.detector import detect_on_image, detect_on_video
 from vision.describer import input_for_func, describe_scene_tinyllama
 from tts.tts_engine import speak_text
 
