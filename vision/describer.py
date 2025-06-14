@@ -1,11 +1,8 @@
-from transformers import pipeline
-from ultralytics import YOLO
+import openai
+import os
 
-# Load a light language model suitable for Streamlit Cloud
-pipe = pipeline("text2text-generation", model="google/flan-t5-large")
-
-# Load YOLO only once (optional - you can move this to main app)
-model = YOLO('yolov8n.pt')
+# Load OpenAI key securely (set this in Streamlit secrets or env)
+openai.api_key = os.getenv("OPENAI_API_KEY", None)
 
 def describe_position(x_center, frame_width):
     if x_center < frame_width / 3:
@@ -17,44 +14,45 @@ def describe_position(x_center, frame_width):
 
 def estimate_distance(x1, x2):
     width_pixels = x2 - x1
-    return round(2.0 * (1 / (width_pixels / 100)), 1)
+    if width_pixels <= 0:
+        return "unknown"
+    return round(2.0 * (1 / (width_pixels / 100)), 1)  # approximate distance
 
-def input_for_func(results, model=model):
+def prepare_detections(results, frame_width, model):
+    """
+    Converts YOLO results into structured data for description.
+    """
     detections = []
     for box in results.boxes:
         x1, y1, x2, y2 = box.xyxy[0].tolist()
         cls_id = int(box.cls[0].item())
         label = model.names[cls_id]
-        detections.append({"label": label, "bbox": [x1, y1, x2, y2]})
-    return detections
-
-def describe_scene(detections, frame_width, use_llm=True):
-    if not detections:
-        return "I couldn't detect anything in your surroundings."
-
-    if not use_llm:
-        description = []
-        for det in detections:
-            label = det["label"]
-            x1, _, x2, _ = det["bbox"]
-            x_center = (x1 + x2) / 2
-            position = describe_position(x_center, frame_width)
-            distance = estimate_distance(x1, x2)
-            description.append(f"{label} {position}, about {distance} meters away")
-        return ". ".join(description)
-
-    # Prepare summary input
-    summary_parts = []
-    for det in detections:
-        label = det["label"]
-        x1, _, x2, _ = det["bbox"]
         x_center = (x1 + x2) / 2
         pos = describe_position(x_center, frame_width)
         dist = estimate_distance(x1, x2)
-        summary_parts.append(f"{label} {pos} approximately {dist} meters")
-    grounded_summary = ", ".join(summary_parts)
+        detections.append(f"{label} {pos}, approx {dist} meters")
+    return detections
 
-    prompt = f"Describe to a blind user what is seen: {grounded_summary}. Respond concisely and clearly."
+def describe_scene(detections):
+    """
+    Uses OpenAI GPT to summarize scene detections.
+    """
+    if not detections:
+        return "I couldn't detect anything around you."
 
-    response = pipe(prompt, max_new_tokens=100)[0]["generated_text"]
-    return response.strip()
+    prompt = (
+        "You are guiding a blind person. Based on the following observations, "
+        "generate a clear and concise sentence describing their surroundings:\n\n"
+        + "\n".join(detections)
+    )
+
+    try:
+        response = openai.ChatCompletion.create(
+            model="gpt-3.5-turbo",  # or gpt-4 if needed
+            messages=[{"role": "user", "content": prompt}],
+            temperature=0.7,
+            max_tokens=100
+        )
+        return response.choices[0].message.content.strip()
+    except Exception as e:
+        return f"Failed to generate description: {e}"
