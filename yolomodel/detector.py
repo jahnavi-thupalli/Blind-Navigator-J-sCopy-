@@ -4,7 +4,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 from ultralytics import YOLO
-from google.colab import files
+#from google.colab import files
 
 model = YOLO('yolov8n.pt')
 
