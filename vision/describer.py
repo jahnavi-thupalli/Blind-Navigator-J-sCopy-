@@ -1,5 +1,5 @@
 from transformers import pipeline, AutoModelForCausalLM, AutoTokenizer
-pipe = pipeline("text-generation", model="TinyLlama/TinyLlama-1.1B-Chat-v1.0", device_map="auto")
+pipe = pipeline("text-generation", model="TinyLlama/TinyLlama-1.1B-Chat-v1.0")
 
 def describe_position(x_center, frame_width):
     if x_center < frame_width / 3:
