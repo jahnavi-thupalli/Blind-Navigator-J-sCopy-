@@ -1,5 +1,8 @@
 import streamlit as st
 import os
+from yolomodel.detector import detect_on_image, detect_on_video, model
+from vision.describer import describe_scene_tinyllama, input_for_func
+from tts.tts_engine import speak_text
 
 # UI Configuration with Dark Theme
 st.set_page_config(
@@ -336,17 +339,6 @@ def get_assets(extensions):
                 assets.append(file)
     return assets
 
-# =============================================
-# MODEL INITIALIZATION (Should be done once)
-# =============================================
-# TODO: Initialize YOLOv8 model here for better performance
-# from yolomodel.detector import ObjectDetector
-# detector = ObjectDetector(weights='yolov8n.pt')  # Example initialization
-
-# TODO: Initialize TTS engine
-# from tts.tts_engine import TTSEngine
-# tts = TTSEngine(engine='gTTS')  # or 'pyttsx3'
-
 # Main UI
 st.markdown("""
 <h1 style="color: #ff7f00 !important; font-family: 'Marker Felt', cursive !important; font-weight: 700 !important; font-size: 3rem !important; text-align: center !important; margin-bottom: 0.5rem !important; letter-spacing: 0.05em !important; text-shadow: 2px 2px 4px rgba(0, 0, 0, 0.3) !important;">Blind Navigator AI</h1>
@@ -368,13 +360,8 @@ with tab1:
         )
         if selected_image:
             with st.container():
-                #st.markdown('<div class="image-container">', unsafe_allow_html=True)
                 st.image(f"assets/{selected_image}", width=300)
-                st.markdown('</div>', unsafe_allow_html=True)
             
-            # =============================================
-            # IMAGE PROCESSING LOGIC
-            # =============================================
             # Add custom styling wrapper
             st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
             describe_image_clicked = st.button(
@@ -387,21 +374,16 @@ with tab1:
             
             if describe_image_clicked:
                 try:
-                    # TODO: Add image processing pipeline
-                    # 1. Run object detection
-                    # results = detector.detect(f"assets/{selected_image}")
-                    
-                    # 2. Convert detections to spatial descriptions
-                    # from vision.describer import generate_description
-                    # description = generate_description(results)
-                    
-                    # 3. Generate audio output
-                    # audio_file = tts.synthesize(description)
-                    # st.audio(audio_file)
-                    
-                    # Temporary placeholder
-                    st.success("Image description generated successfully!")
-                    st.info("Demo output would include: detected objects with positions")
+                    with st.spinner("Processing image..."):
+                        # Process image
+                        results = detect_on_image(f"assets/{selected_image}")
+                        detections = input_for_func(results)
+                        description = describe_scene_tinyllama(detections, frame_width=640)
+                        
+                        # Display and speak
+                        st.success(description)
+                        speak_text(description)
+                        
                 except Exception as e:
                     st.error(f"Error processing image: {str(e)}")
             
@@ -420,13 +402,8 @@ with tab2:
         )
         if selected_video:
             with st.container():
-                #st.markdown('<div class="video-container">', unsafe_allow_html=True)
                 st.video(f"assets/{selected_video}")
-                st.markdown('</div>', unsafe_allow_html=True)
             
-            # =============================================
-            # VIDEO PROCESSING LOGIC
-            # =============================================
             # Add custom styling wrapper
             st.markdown('<div class="custom-button-container">', unsafe_allow_html=True)
             describe_video_clicked = st.button(
@@ -439,28 +416,17 @@ with tab2:
             
             if describe_video_clicked:
                 try:
-                    # TODO: Add video processing pipeline
-                    # from input_handlers.video_processor import process_video
-                    # output_file = process_video(
-                    #     input_path=f"assets/{selected_video}",
-                    #     detector=detector,
-                    #     tts_engine=tts
-                    # )
-                    # st.video(output_file)
-                    
-                    # Temporary placeholder
-                    st.success("Video processing started!")
-                    st.info("Demo would process each frame and provide audio descriptions")
+                    with st.spinner("Processing video (this may take a while)..."):
+                        # Process video (using first frame for demo)
+                        results = detect_on_video(f"assets/{selected_video}")
+                        detections = input_for_func(results)
+                        description = describe_scene_tinyllama(detections, frame_width=640)
+                        
+                        # Display and speak
+                        st.success(description)
+                        speak_text(description)
+                        
                 except Exception as e:
                     st.error(f"Error processing video: {str(e)}")
     else:
         st.warning("No videos found in assets folder")
-
-# =============================================
-# FUTURE INTEGRATION POINTS
-# =============================================
-# TODO: Add webcam integration using streamlit-webrtc
-# TODO: Add settings panel for:
-# - Detection confidence threshold
-# - TTS voice/speed preferences
-# - Object class filtering
