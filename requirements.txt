@@ -1,8 +1,10 @@
 streamlit
 gTTS
 pydub
-Pillow
 opencv-python
 torch
+torchaudio
+Pillow
 numpy
-ultralytics
+transformers
+scipy
