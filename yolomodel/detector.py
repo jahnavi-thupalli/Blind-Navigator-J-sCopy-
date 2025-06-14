@@ -1,43 +1,63 @@
 from ultralytics import YOLO
-import numpy as np
+import cv2
+import matplotlib.pyplot as plt
 
-class ObjectDetector:
-    def __init__(self, model_path: str = "yolov8n.pt", target_classes: list = None, conf_threshold: float = 0.3):
+class YOLODetector:
+    def __init__(self, model_path='yolov8n.pt'):
         self.model = YOLO(model_path)
-        self.target_classes = target_classes
-        self.conf_threshold = conf_threshold
+        self.class_names = self.model.names
 
+def detect_image(self, image_path):
+    img = cv2.imread(image_path)
+    img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
 
-def detect_objects(self, frame):
-    results = self.model.predict(frame, conf=self.conf_threshold, verbose=False)[0]
+    results = self.model(img_rgb)[0]
 
-    detections = []
     for box in results.boxes:
         cls_id = int(box.cls[0])
+        label = self.class_names[cls_id]
         conf = float(box.conf[0])
-        name = self.model.names[cls_id]
-
-        if self.target_classes and name not in self.target_classes:
-            continue
-
         x1, y1, x2, y2 = map(int, box.xyxy[0])
-        bbox = (x1, y1, x2, y2)
-        center_x = (x1 + x2) // 2
+        cv2.rectangle(img_rgb, (x1, y1), (x2, y2), (0, 255, 0), 2)
+        cv2.putText(img_rgb, f'{label} {conf:.2f}', (x1, y1 - 10),
+                    cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
 
-        # Basic spatial classification
-        width = frame.shape[1]
-        if center_x < width / 3:
-            position = "left"
-        elif center_x < 2 * width / 3:
-            position = "center"
-        else:
-            position = "right"
+    plt.figure(figsize=(10, 6))
+    plt.imshow(img_rgb)
+    plt.axis('off')
+    plt.title('YOLOv8 Detection - Image')
+    plt.show()
 
-        detections.append({
-            "name": name,
-            "conf": round(conf, 2),
-            "bbox": bbox,
-            "position": position
-        })
+def detect_video(self, video_path, output_path='output.mp4', verbose=True):
+    cap = cv2.VideoCapture(video_path)
+    width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    fps = cap.get(cv2.CAP_PROP_FPS)
 
-    return detections
+    out = cv2.VideoWriter(output_path, cv2.VideoWriter_fourcc(*'mp4v'), fps, (width, height))
+
+    frame_num = 0
+    while cap.isOpened():
+        ret, frame = cap.read()
+        if not ret:
+            break
+
+        results = self.model(frame)[0]
+
+        for box in results.boxes:
+            cls_id = int(box.cls[0])
+            label = self.class_names[cls_id]
+            conf = float(box.conf[0])
+            x1, y1, x2, y2 = map(int, box.xyxy[0])
+            cv2.rectangle(frame, (x1, y1), (x2, y2), (0, 255, 0), 2)
+            cv2.putText(frame, f'{label} {conf:.2f}', (x1, y1 - 10),
+                        cv2.FONT_HERSHEY_SIMPLEX, 0.6, (255, 255, 255), 2)
+
+        out.write(frame)
+        frame_num += 1
+        if verbose and frame_num % 10 == 0:
+            print(f'Processed {frame_num} frames...')
+
+    cap.release()
+    out.release()
+    return output_path
